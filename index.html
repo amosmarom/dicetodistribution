@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Dice to Distribution</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; background: #f5f5f3; color: #1a1a1a; padding: 2rem; min-height: 100vh; }
+  h1 { font-size: 22px; font-weight: 500; margin-bottom: 1.5rem; }
+  .card { background: #fff; border-radius: 12px; border: 0.5px solid rgba(0,0,0,0.12); padding: 1.25rem 1.5rem; margin-bottom: 1.25rem; }
+  .ctrl-row { display: flex; align-items: center; gap: 16px; margin-bottom: 1rem; flex-wrap: wrap; }
+  .ctrl-label { font-size: 14px; color: #666; white-space: nowrap; min-width: 110px; }
+  .ctrl-val { font-size: 15px; font-weight: 500; min-width: 28px; }
+  input[type=range] { flex: 1; min-width: 100px; accent-color: #378ADD; cursor: pointer; }
+  button { padding: 8px 16px; font-size: 14px; cursor: pointer; border-radius: 8px; border: 0.5px solid rgba(0,0,0,0.25); background: transparent; color: #1a1a1a; transition: background 0.15s; }
+  button:hover { background: #f0f0f0; }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+  button.primary { font-weight: 500; padding: 8px 22px; }
+  .bin-mode { font-size: 12px; padding: 3px 10px; }
+  .bin-mode.active { background: #378ADD; color: #fff; border-color: #378ADD; }
+  .die { width: 63px; height: 63px; display: flex; align-items: center; justify-content: center; font-size: 39px; border-radius: 8px; border: 0.5px solid rgba(0,0,0,0.2); background: #fff; }
+  #diceArea { display: flex; flex-wrap: wrap; gap: 8px; min-height: 71px; margin-bottom: 1.25rem; }
+  .stats-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; margin-bottom: 1.25rem; }
+  .stat { background: #f5f5f3; border-radius: 8px; padding: 10px 12px; }
+  .stat-label { font-size: 12px; color: #888; margin-bottom: 4px; }
+  .stat-val { font-size: 20px; font-weight: 500; }
+  .sum-pill { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 12px; background: #f5f5f3; color: #666; border: 0.5px solid rgba(0,0,0,0.1); margin: 2px 3px; }
+  .sum-pill.last { background: #E6F1FB; color: #0C447C; border-color: #85B7EB; }
+  .sums-wrap { line-height: 2; margin-bottom: 1.25rem; }
+  .progress-wrap { margin-bottom: 1rem; display: none; }
+  .progress-top { display: flex; justify-content: space-between; font-size: 12px; color: #888; margin-bottom: 4px; }
+  .progress-track { height: 4px; background: #e8e8e8; border-radius: 2px; overflow: hidden; }
+  .progress-fill { height: 100%; width: 0%; background: #378ADD; border-radius: 2px; transition: width 0.15s; }
+  @media (max-width: 600px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } body { padding: 1rem; } }
+</style>
+</head>
+<body>
+
+<h1>Dice to distribution</h1>
+
+<div class="card">
+  <div class="ctrl-row">
+    <span class="ctrl-label">Number of dice</span>
+    <input type="range" min="2" max="20" value="6" id="diceCount" step="1" />
+    <span class="ctrl-val" id="diceCountOut">6</span>
+    <button class="primary" id="rollBtn">Roll</button>
+    <button id="roll10Btn">Roll ×10</button>
+    <button id="roll100Btn">Roll ×100</button>
+    <button id="resetBtn">Reset</button>
+  </div>
+  <div class="ctrl-row">
+    <span class="ctrl-label">Bin size</span>
+    <button class="bin-mode" id="binAuto" onclick="setBinMode('auto')">Auto</button>
+    <button class="bin-mode" id="binManual" onclick="setBinMode('manual')">Manual</button>
+    <input type="range" min="1" max="20" value="2" id="binSlider" step="1" style="display:none;" />
+    <span class="ctrl-val" id="binVal" style="display:none;"></span>
+    <span id="binAutoLabel" style="font-size:13px; color:#888;"></span>
+  </div>
+</div>
+
+<div id="diceArea"></div>
+
+<div class="progress-wrap" id="progressBar">
+  <div class="progress-top">
+    <span id="progressLabel">Rolling…</span>
+    <span id="progressPct">0%</span>
+  </div>
+  <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+</div>
+
+<div class="stats-grid" id="statsRow" style="display:none;">
+  <div class="stat"><div class="stat-label">Rolls</div><div class="stat-val" id="statRolls">0</div></div>
+  <div class="stat"><div class="stat-label">Last sum</div><div class="stat-val" id="statLast">—</div></div>
+  <div class="stat"><div class="stat-label">Average</div><div class="stat-val" id="statAvg">—</div></div>
+  <div class="stat"><div class="stat-label">Bin size</div><div class="stat-val" id="statBin">—</div></div>
+</div>
+
+<div id="sumsRow" style="display:none;">
+  <div style="font-size:12px; color:#888; margin-bottom:6px;">All sums</div>
+  <div class="sums-wrap" id="sumsList"></div>
+</div>
+
+<div class="card" id="chartSection" style="display:none;">
+  <div style="position:relative; width:100%; height:300px;">
+    <canvas id="chart" role="img" aria-label="Vertical histogram of dice roll sum frequencies">No data yet.</canvas>
+  </div>
+</div>
+
+<script>
+const slider = document.getElementById('diceCount');
+const sliderOut = document.getElementById('diceCountOut');
+const rollBtn = document.getElementById('rollBtn');
+const roll10Btn = document.getElementById('roll10Btn');
+const roll100Btn = document.getElementById('roll100Btn');
+const resetBtn = document.getElementById('resetBtn');
+const diceArea = document.getElementById('diceArea');
+const chartSection = document.getElementById('chartSection');
+const statsRow = document.getElementById('statsRow');
+const sumsRow = document.getElementById('sumsRow');
+const sumsList = document.getElementById('sumsList');
+const binSlider = document.getElementById('binSlider');
+const binVal = document.getElementById('binVal');
+const binAutoLabel = document.getElementById('binAutoLabel');
+const progressBar = document.getElementById('progressBar');
+const progressLabel = document.getElementById('progressLabel');
+const progressPct = document.getElementById('progressPct');
+const progressFill = document.getElementById('progressFill');
+
+let sums = [], chartInstance = null, rolling = false;
+let binMode = 'auto';
+const faces = ['⚀','⚁','⚂','⚃','⚄','⚅'];
+let audioCtx = null;
+
+function getAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+function playClack(time, vol) {
+  const ctx = getAudio();
+  const buf = ctx.createBuffer(1, ctx.sampleRate * 0.06, ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = (Math.random()*2-1) * Math.pow(1-i/d.length, 3);
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(vol, time);
+  gain.gain.exponentialRampToValueAtTime(0.001, time + 0.055);
+  const filt = ctx.createBiquadFilter();
+  filt.type = 'bandpass';
+  filt.frequency.value = 1800 + Math.random()*600;
+  filt.Q.value = 0.8;
+  src.connect(filt); filt.connect(gain); gain.connect(ctx.destination);
+  src.start(time);
+}
+function playRollSound(durationMs) {
+  const ctx = getAudio(), now = ctx.currentTime, dur = durationMs/1000;
+  let t = 0;
+  while (t < dur) {
+    const p = t/dur;
+    playClack(now+t, 0.25+p*0.1);
+    t += (0.12 - p*0.09) + Math.random()*0.04;
+  }
+  playClack(now+dur-0.05, 0.5);
+  playClack(now+dur, 0.4);
+  playClack(now+dur+0.06, 0.2);
+}
+
+function getAutoBin(n) {
+  if (n<=3) return 1; if (n<=6) return 2; if (n<=10) return 3; if (n<=15) return 4; return 5;
+}
+function getCurrentBin() {
+  return binMode==='auto' ? getAutoBin(+slider.value) : +binSlider.value;
+}
+function setBinMode(mode) {
+  binMode = mode;
+  document.getElementById('binAuto').classList.toggle('active', mode==='auto');
+  document.getElementById('binManual').classList.toggle('active', mode==='manual');
+  binSlider.style.display = mode==='manual' ? '' : 'none';
+  binVal.style.display = mode==='manual' ? '' : 'none';
+  binAutoLabel.style.display = mode==='auto' ? '' : 'none';
+  if (mode==='manual') { binSlider.value = getAutoBin(+slider.value); binVal.textContent = binSlider.value; }
+  updateBinAutoLabel();
+  if (sums.length) updateUI();
+}
+function updateBinAutoLabel() {
+  if (binMode==='auto') binAutoLabel.textContent = `auto = ${getAutoBin(+slider.value)}`;
+}
+binSlider.addEventListener('input', () => { binVal.textContent = binSlider.value; if (sums.length) updateUI(); });
+
+function buildHistogram(data, binSize, minVal, maxVal) {
+  const labels=[], bins=[];
+  for (let lo=minVal; lo<=maxVal; lo+=binSize) {
+    const hi=Math.min(lo+binSize-1, maxVal);
+    labels.push(binSize===1 ? String(lo) : `${lo}–${hi}`);
+    bins.push(data.filter(v=>v>=lo&&v<=hi).length);
+  }
+  return {labels, bins};
+}
+function renderDice(values) {
+  diceArea.innerHTML='';
+  values.forEach(v => { const d=document.createElement('div'); d.className='die'; d.textContent=faces[v]; diceArea.appendChild(d); });
+}
+function updateUI() {
+  const n=+slider.value, minVal=n, maxVal=n*6, binSize=getCurrentBin();
+  const {labels, bins}=buildHistogram(sums, binSize, minVal, maxVal);
+  statsRow.style.display='grid'; sumsRow.style.display='block'; chartSection.style.display='block';
+  document.getElementById('statRolls').textContent=sums.length;
+  document.getElementById('statLast').textContent=sums[sums.length-1];
+  document.getElementById('statAvg').textContent=(sums.reduce((a,b)=>a+b,0)/sums.length).toFixed(1);
+  document.getElementById('statBin').textContent=binSize;
+  sumsList.innerHTML=sums.map((s,i)=>`<span class="sum-pill${i===sums.length-1?' last':''}">${s}</span>`).join('');
+  if (!chartInstance) {
+    chartInstance=new Chart(document.getElementById('chart'), {
+      type:'bar',
+      data:{labels, datasets:[{label:'Count', data:bins, backgroundColor:'#378ADD', borderRadius:3, borderSkipped:false}]},
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>` Count: ${ctx.raw}`}}},
+        scales:{
+          x:{grid:{display:false}, ticks:{color:'#888', font:{size:11}, autoSkip:false, maxRotation:45}},
+          y:{beginAtZero:true, grid:{color:'rgba(0,0,0,0.06)'}, ticks:{color:'#888', font:{size:12}, stepSize:1, callback:v=>Number.isInteger(v)?v:''}}
+        },
+        animation:{duration:300}
+      }
+    });
+  } else {
+    chartInstance.data.labels=labels;
+    chartInstance.data.datasets[0].data=bins;
+    chartInstance.update();
+  }
+}
+
+function setButtons(disabled, label) {
+  rollBtn.disabled=disabled; roll10Btn.disabled=disabled; roll100Btn.disabled=disabled;
+  rollBtn.textContent=disabled&&label==='roll'?'Rolling…':'Roll';
+  roll10Btn.textContent=disabled&&label==='10'?'…':'Roll ×10';
+  roll100Btn.textContent=disabled&&label==='100'?'…':'Roll ×100';
+}
+function setProgress(show, current, total) {
+  progressBar.style.display = show ? 'block' : 'none';
+  if (show) {
+    progressLabel.textContent = `Rolling ${current} / ${total}…`;
+    const pct = Math.round(current/total*100);
+    progressPct.textContent = pct + '%';
+    progressFill.style.width = pct + '%';
+  }
+}
+function animateAndRoll(count, durationMs, onDone) {
+  playRollSound(durationMs);
+  const start=Date.now();
+  const iv=setInterval(()=>{
+    renderDice(Array.from({length:count},()=>Math.floor(Math.random()*6)));
+    if (Date.now()-start>=durationMs) {
+      clearInterval(iv);
+      const final=Array.from({length:count},()=>Math.floor(Math.random()*6));
+      renderDice(final); onDone(final);
+    }
+  }, 80);
+}
+
+function doManyRolls(total) {
+  rolling=true; setButtons(true, total===10?'10':'100');
+  const count=+slider.value;
+  const perRollMs = total===100 ? 100 : 2000;
+  let done=0;
+  if (total===100) setProgress(true, 0, total);
+  function doOne() {
+    animateAndRoll(count, perRollMs, (final)=>{
+      done++;
+      sums.push(final.reduce((a,v)=>a+v+1,0));
+      if (total===100) setProgress(true, done, total);
+      updateUI();
+      if (done<total) doOne();
+      else { if (total===100) setProgress(false); rolling=false; setButtons(false); }
+    });
+  }
+  doOne();
+}
+
+rollBtn.addEventListener('click', ()=>{
+  if (rolling) return; rolling=true; setButtons(true,'roll');
+  animateAndRoll(+slider.value, 2000, (final)=>{ sums.push(final.reduce((a,v)=>a+v+1,0)); updateUI(); rolling=false; setButtons(false); });
+});
+roll10Btn.addEventListener('click', ()=>{ if (!rolling) doManyRolls(10); });
+roll100Btn.addEventListener('click', ()=>{ if (!rolling) doManyRolls(100); });
+resetBtn.addEventListener('click', ()=>{
+  sums=[];
+  if (chartInstance){chartInstance.destroy();chartInstance=null;}
+  statsRow.style.display='none'; sumsRow.style.display='none'; chartSection.style.display='none';
+  setProgress(false); diceArea.innerHTML='';
+  renderDice(Array.from({length:+slider.value},()=>Math.floor(Math.random()*6)));
+});
+slider.addEventListener('input', ()=>{
+  sliderOut.textContent=slider.value;
+  updateBinAutoLabel();
+  if (binMode==='manual') binSlider.max=Math.max(1,+slider.value*6-+slider.value);
+  if (sums.length) {
+    sums=[]; if (chartInstance){chartInstance.destroy();chartInstance=null;}
+    statsRow.style.display='none'; sumsRow.style.display='none'; chartSection.style.display='none';
+  }
+  renderDice(Array.from({length:+slider.value},()=>Math.floor(Math.random()*6)));
+});
+
+setBinMode('auto');
+renderDice(Array.from({length:6},()=>Math.floor(Math.random()*6)));
+</script>
+</body>
+</html>
