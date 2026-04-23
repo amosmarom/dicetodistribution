@@ -1,4 +1,4 @@
-<!-- Dice to Distribution v1.3 — 2026-04-23 16:45 -->
+<!-- Dice to Distribution v1.4 — 2026-04-23 17:00 -->
 <!DOCTYPE html>
 <html lang="en" dir="ltr">
 <head>
@@ -27,10 +27,10 @@
   button.primary { font-weight: 500; padding: 8px 22px; }
   .bin-mode { font-size: 12px; padding: 3px 10px; }
   .bin-mode.active { background: #378ADD; color: #fff; border-color: #378ADD; }
-  .die { width: 63px; height: 63px; display: flex; align-items: center; justify-content: center; font-size: 39px; border-radius: 8px; border: 0.5px solid rgba(0,0,0,0.2); background: #fff; }
-  .die.numeric { font-size: 20px; font-weight: 600; }
+  .die { width: 126px; height: 126px; display: flex; align-items: center; justify-content: center; font-size: 78px; border-radius: 12px; border: 0.5px solid rgba(0,0,0,0.2); background: #fff; }
+  .die.numeric { font-size: 40px; font-weight: 600; }
   .die.faked { border-color: #e06c5a; background: #FFF6F5; }
-  #diceArea { display: flex; flex-wrap: wrap; gap: 8px; min-height: 71px; margin-bottom: 1.25rem; }
+  #diceArea { display: flex; flex-wrap: wrap; gap: 10px; min-height: 134px; margin-bottom: 1.25rem; }
   .stats-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; margin-bottom: 1.25rem; }
   .stat { background: #f5f5f3; border-radius: 8px; padding: 10px 12px; }
   .stat-label { font-size: 12px; color: #888; margin-bottom: 4px; }
@@ -56,7 +56,7 @@
 <div class="title-row">
   <h1 id="mainTitle">Dice to distribution</h1>
   <div style="display:flex;align-items:center;gap:12px;">
-    <span style="font-size:11px;color:#bbb;white-space:nowrap;">v1.3 &middot; 2026-04-23 16:45</span>
+    <span style="font-size:11px;color:#bbb;white-space:nowrap;">v1.4 &middot; 2026-04-23 17:00</span>
     <button class="lang-btn" id="langBtn" onclick="toggleLang()">עב</button>
   </div>
 </div>
@@ -70,6 +70,7 @@
     <button id="roll10Btn">Roll ×10</button>
     <button id="roll100Btn">Roll ×100</button>
     <button id="resetBtn">Reset</button>
+    <button id="muteBtn" onclick="toggleMute()" title="Mute / Unmute" style="font-size:18px;padding:6px 10px;">🔊</button>
   </div>
   <div class="ctrl-row">
     <span class="ctrl-label" id="labelDieRange">Die range</span>
@@ -159,7 +160,7 @@ const biasSlider   = document.getElementById('biasSlider');
 const biasValEl    = document.getElementById('biasVal');
 const langBtn      = document.getElementById('langBtn');
 
-let sums = [], chartInstance = null, rolling = false;
+let sums = [], chartInstance = null, rolling = false, muted = false;
 let binMode = 'auto';
 const faces = ['⚀','⚁','⚂','⚃','⚄','⚅'];
 let audioCtx = null;
@@ -268,6 +269,11 @@ function updateRangeHint() {
 function updateBiasVal() {
   const b = +biasSlider.value;
   biasValEl.textContent = b === 0 ? L('biasFair') : b > 0 ? L('biasValHigh', b) : L('biasValLow', b);
+}
+
+function toggleMute() {
+  muted = !muted;
+  document.getElementById('muteBtn').textContent = muted ? '🔇' : '🔊';
 }
 
 function getAudio() {
@@ -410,7 +416,7 @@ function setProgress(show, current, total) {
   }
 }
 function animateAndRoll(count, durationMs, onDone) {
-  playRollSound(durationMs);
+  if (!muted) playRollSound(durationMs);
   const start = Date.now();
   const iv = setInterval(() => {
     renderDice(Array.from({length:count}, ()=>rollDie()));
@@ -425,7 +431,7 @@ function animateAndRoll(count, durationMs, onDone) {
 function doManyRolls(total) {
   rolling=true; setButtons(true, total===10?'10':'100');
   const count = +slider.value;
-  const perRollMs = total===100 ? 100 : 2000;
+  const perRollMs = total===100 ? 50 : 2000;
   let done = 0;
   if (total===100) setProgress(true, 0, total);
   function doOne() {
