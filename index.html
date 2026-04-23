@@ -1,4 +1,4 @@
-<!-- Dice to Distribution v1.2 — 2026-04-23 16:30 -->
+<!-- Dice to Distribution v1.3 — 2026-04-23 16:45 -->
 <!DOCTYPE html>
 <html lang="en" dir="ltr">
 <head>
@@ -56,7 +56,7 @@
 <div class="title-row">
   <h1 id="mainTitle">Dice to distribution</h1>
   <div style="display:flex;align-items:center;gap:12px;">
-    <span style="font-size:11px;color:#bbb;white-space:nowrap;">v1.2 &middot; 2026-04-23 16:30</span>
+    <span style="font-size:11px;color:#bbb;white-space:nowrap;">v1.3 &middot; 2026-04-23 16:45</span>
     <button class="lang-btn" id="langBtn" onclick="toggleLang()">עב</button>
   </div>
 </div>
@@ -64,8 +64,8 @@
 <div class="card">
   <div class="ctrl-row">
     <span class="ctrl-label" id="labelNumDice">Number of dice</span>
-    <input type="range" min="2" max="20" value="6" id="diceCount" step="1" />
-    <span class="ctrl-val" id="diceCountOut">6</span>
+    <input type="range" min="1" max="20" value="6" id="diceCount" step="1" style="max-width:120px;" />
+    <span style="font-size:26px;font-weight:600;min-width:36px;" id="diceCountOut">6</span>
     <button class="primary" id="rollBtn">Roll</button>
     <button id="roll10Btn">Roll ×10</button>
     <button id="roll100Btn">Roll ×100</button>
