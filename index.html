@@ -1,4 +1,4 @@
-<!-- Dice to Distribution v1.4 — 2026-04-23 17:00 -->
+<!-- Dice to Distribution v1.5 — 2026-04-23 17:15 -->
 <!DOCTYPE html>
 <html lang="en" dir="ltr">
 <head>
@@ -56,7 +56,7 @@
 <div class="title-row">
   <h1 id="mainTitle">Dice to distribution</h1>
   <div style="display:flex;align-items:center;gap:12px;">
-    <span style="font-size:11px;color:#bbb;white-space:nowrap;">v1.4 &middot; 2026-04-23 17:00</span>
+    <span style="font-size:11px;color:#bbb;white-space:nowrap;">v1.5 &middot; 2026-04-23 17:15</span>
     <button class="lang-btn" id="langBtn" onclick="toggleLang()">עב</button>
   </div>
 </div>
@@ -125,8 +125,8 @@
   <div class="sums-wrap" id="sumsList"></div>
 </div>
 
-<div class="card" id="chartSection" style="display:none;">
-  <div style="position:relative; width:100%; height:300px;">
+<div class="card" id="chartSection">
+  <div style="position:relative; width:75%; height:300px;">
     <canvas id="chart" role="img" aria-label="Vertical histogram of dice roll sum frequencies">No data yet.</canvas>
   </div>
 </div>
@@ -330,12 +330,12 @@ function setBinMode(mode) {
   binAutoLabel.style.display = mode==='auto'   ? '' : 'none';
   if (mode==='manual') { binSlider.value = getAutoBin(); binVal.textContent = binSlider.value; }
   updateBinAutoLabel();
-  if (sums.length) updateUI();
+  updateUI();
 }
 function updateBinAutoLabel() {
   if (binMode==='auto') binAutoLabel.textContent = L('autoEq', getAutoBin());
 }
-binSlider.addEventListener('input', () => { binVal.textContent = binSlider.value; if (sums.length) updateUI(); });
+binSlider.addEventListener('input', () => { binVal.textContent = binSlider.value; updateUI(); });
 
 function buildHistogram(data, binSize, minVal, maxVal) {
   const labels=[], bins=[];
@@ -366,12 +366,15 @@ function updateUI() {
   const minVal = n * getDieMin(), maxVal = n * getDieMax();
   const binSize = getCurrentBin();
   const {labels, bins} = buildHistogram(sums, binSize, minVal, maxVal);
-  statsRow.style.display='grid'; sumsRow.style.display='block'; chartSection.style.display='block';
-  document.getElementById('statRolls').textContent = sums.length;
-  document.getElementById('statLast').textContent  = sums[sums.length-1];
-  document.getElementById('statAvg').textContent   = (sums.reduce((a,b)=>a+b,0)/sums.length).toFixed(1);
-  document.getElementById('statBin').textContent   = binSize;
-  sumsList.innerHTML = sums.map((s,i)=>`<span class="sum-pill${i===sums.length-1?' last':''}">${s}</span>`).join('');
+  const yMax = sums.length > 0 ? sums.length : undefined;
+  if (sums.length > 0) {
+    statsRow.style.display='grid'; sumsRow.style.display='block';
+    document.getElementById('statRolls').textContent = sums.length;
+    document.getElementById('statLast').textContent  = sums[sums.length-1];
+    document.getElementById('statAvg').textContent   = (sums.reduce((a,b)=>a+b,0)/sums.length).toFixed(1);
+    document.getElementById('statBin').textContent   = binSize;
+    sumsList.innerHTML = sums.map((s,i)=>`<span class="sum-pill${i===sums.length-1?' last':''}">${s}</span>`).join('');
+  }
   if (!chartInstance) {
     chartInstance = new Chart(document.getElementById('chart'), {
       type: 'bar',
@@ -381,7 +384,7 @@ function updateUI() {
         plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>` Count: ${ctx.raw}`}}},
         scales:{
           x:{grid:{display:false}, ticks:{color:'#888', font:{size:11}, autoSkip:false, maxRotation:45}},
-          y:{beginAtZero:true, grid:{color:'rgba(0,0,0,0.06)'}, ticks:{color:'#888', font:{size:12}, stepSize:1, callback:v=>Number.isInteger(v)?v:''}}
+          y:{beginAtZero:true, max:yMax, grid:{color:'rgba(0,0,0,0.06)'}, ticks:{color:'#888', font:{size:12}, stepSize:1, callback:v=>Number.isInteger(v)?v:''}}
         },
         animation:{duration:300}
       }
@@ -390,14 +393,16 @@ function updateUI() {
     chartInstance.data.labels = labels;
     chartInstance.data.datasets[0].data = bins;
     chartInstance.data.datasets[0].backgroundColor = chartColor();
+    chartInstance.options.scales.y.max = yMax;
     chartInstance.update();
   }
 }
 
 function resetSums() {
   sums = [];
+  statsRow.style.display='none'; sumsRow.style.display='none';
   if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
-  statsRow.style.display='none'; sumsRow.style.display='none'; chartSection.style.display='none';
+  updateUI();
 }
 
 function setButtons(disabled, label) {
@@ -494,7 +499,7 @@ fakeToggle.addEventListener('change', () => {
   const on = fakeToggle.checked;
   fakeLabel.textContent = on ? L('on') : L('off');
   biasRow.style.display = on ? 'flex' : 'none';
-  if (sums.length) updateUI();
+  updateUI();
   renderDice(Array.from({length:+slider.value}, ()=>rollDie()));
 });
 
@@ -503,6 +508,7 @@ biasSlider.addEventListener('input', updateBiasVal);
 setBinMode('auto');
 updateRangeHint();
 renderDice(Array.from({length:6}, ()=>rollDie()));
+updateUI();
 </script>
 </body>
 </html>
