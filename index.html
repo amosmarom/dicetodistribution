@@ -1,5 +1,6 @@
+<!-- Dice to Distribution v1.2 — 2026-04-23 16:30 -->
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" dir="ltr">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -8,12 +9,18 @@
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: system-ui, sans-serif; background: #f5f5f3; color: #1a1a1a; padding: 2rem; min-height: 100vh; }
-  h1 { font-size: 22px; font-weight: 500; margin-bottom: 1.5rem; }
+  .title-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1.5rem; }
+  h1 { font-size: 22px; font-weight: 500; }
+  .lang-btn { font-size: 13px; padding: 4px 12px; border-radius: 6px; border: 0.5px solid rgba(0,0,0,0.2); background: transparent; cursor: pointer; color: #555; }
+  .lang-btn:hover { background: #e8e8e8; }
   .card { background: #fff; border-radius: 12px; border: 0.5px solid rgba(0,0,0,0.12); padding: 1.25rem 1.5rem; margin-bottom: 1.25rem; }
   .ctrl-row { display: flex; align-items: center; gap: 16px; margin-bottom: 1rem; flex-wrap: wrap; }
+  .ctrl-row:last-child { margin-bottom: 0; }
   .ctrl-label { font-size: 14px; color: #666; white-space: nowrap; min-width: 110px; }
   .ctrl-val { font-size: 15px; font-weight: 500; min-width: 28px; }
   input[type=range] { flex: 1; min-width: 100px; accent-color: #378ADD; cursor: pointer; }
+  input[type=number] { width: 58px; padding: 5px 6px; font-size: 14px; border: 0.5px solid rgba(0,0,0,0.25); border-radius: 6px; background: #fff; color: #1a1a1a; text-align: center; }
+  input[type=number]:focus { outline: none; border-color: #378ADD; }
   button { padding: 8px 16px; font-size: 14px; cursor: pointer; border-radius: 8px; border: 0.5px solid rgba(0,0,0,0.25); background: transparent; color: #1a1a1a; transition: background 0.15s; }
   button:hover { background: #f0f0f0; }
   button:disabled { opacity: 0.45; cursor: not-allowed; }
@@ -21,6 +28,8 @@
   .bin-mode { font-size: 12px; padding: 3px 10px; }
   .bin-mode.active { background: #378ADD; color: #fff; border-color: #378ADD; }
   .die { width: 63px; height: 63px; display: flex; align-items: center; justify-content: center; font-size: 39px; border-radius: 8px; border: 0.5px solid rgba(0,0,0,0.2); background: #fff; }
+  .die.numeric { font-size: 20px; font-weight: 600; }
+  .die.faked { border-color: #e06c5a; background: #FFF6F5; }
   #diceArea { display: flex; flex-wrap: wrap; gap: 8px; min-height: 71px; margin-bottom: 1.25rem; }
   .stats-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; margin-bottom: 1.25rem; }
   .stat { background: #f5f5f3; border-radius: 8px; padding: 10px 12px; }
@@ -33,16 +42,28 @@
   .progress-top { display: flex; justify-content: space-between; font-size: 12px; color: #888; margin-bottom: 4px; }
   .progress-track { height: 4px; background: #e8e8e8; border-radius: 2px; overflow: hidden; }
   .progress-fill { height: 100%; width: 0%; background: #378ADD; border-radius: 2px; transition: width 0.15s; }
+  .bias-range { display: flex; align-items: center; gap: 8px; }
+  .bias-range input[type=range] { accent-color: #e06c5a; width: 90px; flex: none; min-width: unset; }
+  .bias-lbl { font-size: 12px; color: #888; white-space: nowrap; }
+  .bias-val { font-size: 13px; font-weight: 500; min-width: 60px; color: #e06c5a; }
+  .fake-hint { font-size: 11px; color: #bbb; font-style: italic; }
+  .range-hint { font-size: 12px; color: #aaa; }
   @media (max-width: 600px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } body { padding: 1rem; } }
 </style>
 </head>
 <body>
 
-<h1>Dice to distribution</h1>
+<div class="title-row">
+  <h1 id="mainTitle">Dice to distribution</h1>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <span style="font-size:11px;color:#bbb;white-space:nowrap;">v1.2 &middot; 2026-04-23 16:30</span>
+    <button class="lang-btn" id="langBtn" onclick="toggleLang()">עב</button>
+  </div>
+</div>
 
 <div class="card">
   <div class="ctrl-row">
-    <span class="ctrl-label">Number of dice</span>
+    <span class="ctrl-label" id="labelNumDice">Number of dice</span>
     <input type="range" min="2" max="20" value="6" id="diceCount" step="1" />
     <span class="ctrl-val" id="diceCountOut">6</span>
     <button class="primary" id="rollBtn">Roll</button>
@@ -51,7 +72,28 @@
     <button id="resetBtn">Reset</button>
   </div>
   <div class="ctrl-row">
-    <span class="ctrl-label">Bin size</span>
+    <span class="ctrl-label" id="labelDieRange">Die range</span>
+    <input type="number" id="dieMin" value="1" />
+    <span id="rangeTo" style="font-size:13px;color:#888;">to</span>
+    <input type="number" id="dieMax" value="6" />
+    <span class="range-hint" id="rangeHint">d6</span>
+  </div>
+  <div class="ctrl-row">
+    <span class="ctrl-label" id="labelFakeDice">Fake dice</span>
+    <label style="display:flex;align-items:center;gap:7px;cursor:pointer;">
+      <input type="checkbox" id="fakeToggle" style="width:16px;height:16px;cursor:pointer;accent-color:#e06c5a;" />
+      <span style="font-size:14px;color:#666;" id="fakeLabel">Off</span>
+    </label>
+    <span class="fake-hint" id="fakeHint">Loads the dice — skews outcomes toward low or high values</span>
+    <span class="bias-range" id="biasRow" style="display:none;">
+      <span class="bias-lbl" id="labelBiasLow">Low</span>
+      <input type="range" min="-10" max="10" value="0" id="biasSlider" />
+      <span class="bias-lbl" id="labelBiasHigh">High</span>
+      <span class="bias-val" id="biasVal">fair</span>
+    </span>
+  </div>
+  <div class="ctrl-row">
+    <span class="ctrl-label" id="labelBinSize">Bin size</span>
     <button class="bin-mode" id="binAuto" onclick="setBinMode('auto')">Auto</button>
     <button class="bin-mode" id="binManual" onclick="setBinMode('manual')">Manual</button>
     <input type="range" min="1" max="20" value="2" id="binSlider" step="1" style="display:none;" />
@@ -71,14 +113,14 @@
 </div>
 
 <div class="stats-grid" id="statsRow" style="display:none;">
-  <div class="stat"><div class="stat-label">Rolls</div><div class="stat-val" id="statRolls">0</div></div>
-  <div class="stat"><div class="stat-label">Last sum</div><div class="stat-val" id="statLast">—</div></div>
-  <div class="stat"><div class="stat-label">Average</div><div class="stat-val" id="statAvg">—</div></div>
-  <div class="stat"><div class="stat-label">Bin size</div><div class="stat-val" id="statBin">—</div></div>
+  <div class="stat"><div class="stat-label" id="labelStatRolls">Rolls</div><div class="stat-val" id="statRolls">0</div></div>
+  <div class="stat"><div class="stat-label" id="labelStatLast">Last sum</div><div class="stat-val" id="statLast">—</div></div>
+  <div class="stat"><div class="stat-label" id="labelStatAvg">Average</div><div class="stat-val" id="statAvg">—</div></div>
+  <div class="stat"><div class="stat-label" id="labelStatBin">Bin size</div><div class="stat-val" id="statBin">—</div></div>
 </div>
 
 <div id="sumsRow" style="display:none;">
-  <div style="font-size:12px; color:#888; margin-bottom:6px;">All sums</div>
+  <div style="font-size:12px; color:#888; margin-bottom:6px;" id="allSumsLabel">All sums</div>
   <div class="sums-wrap" id="sumsList"></div>
 </div>
 
@@ -89,29 +131,144 @@
 </div>
 
 <script>
-const slider = document.getElementById('diceCount');
-const sliderOut = document.getElementById('diceCountOut');
-const rollBtn = document.getElementById('rollBtn');
-const roll10Btn = document.getElementById('roll10Btn');
-const roll100Btn = document.getElementById('roll100Btn');
-const resetBtn = document.getElementById('resetBtn');
-const diceArea = document.getElementById('diceArea');
+const slider       = document.getElementById('diceCount');
+const sliderOut    = document.getElementById('diceCountOut');
+const rollBtn      = document.getElementById('rollBtn');
+const roll10Btn    = document.getElementById('roll10Btn');
+const roll100Btn   = document.getElementById('roll100Btn');
+const resetBtn     = document.getElementById('resetBtn');
+const diceArea     = document.getElementById('diceArea');
 const chartSection = document.getElementById('chartSection');
-const statsRow = document.getElementById('statsRow');
-const sumsRow = document.getElementById('sumsRow');
-const sumsList = document.getElementById('sumsList');
-const binSlider = document.getElementById('binSlider');
-const binVal = document.getElementById('binVal');
+const statsRow     = document.getElementById('statsRow');
+const sumsRow      = document.getElementById('sumsRow');
+const sumsList     = document.getElementById('sumsList');
+const binSlider    = document.getElementById('binSlider');
+const binVal       = document.getElementById('binVal');
 const binAutoLabel = document.getElementById('binAutoLabel');
-const progressBar = document.getElementById('progressBar');
-const progressLabel = document.getElementById('progressLabel');
-const progressPct = document.getElementById('progressPct');
+const progressBar  = document.getElementById('progressBar');
+const progressLabel= document.getElementById('progressLabel');
+const progressPct  = document.getElementById('progressPct');
 const progressFill = document.getElementById('progressFill');
+const dieMinEl     = document.getElementById('dieMin');
+const dieMaxEl     = document.getElementById('dieMax');
+const rangeHint    = document.getElementById('rangeHint');
+const fakeToggle   = document.getElementById('fakeToggle');
+const fakeLabel    = document.getElementById('fakeLabel');
+const biasRow      = document.getElementById('biasRow');
+const biasSlider   = document.getElementById('biasSlider');
+const biasValEl    = document.getElementById('biasVal');
+const langBtn      = document.getElementById('langBtn');
 
 let sums = [], chartInstance = null, rolling = false;
 let binMode = 'auto';
 const faces = ['⚀','⚁','⚂','⚃','⚄','⚅'];
 let audioCtx = null;
+let currentLang = 'en';
+
+const I18N = {
+  en: {
+    title: 'Dice to distribution',
+    numDice: 'Number of dice',
+    roll: 'Roll', roll10: 'Roll ×10', roll100: 'Roll ×100', reset: 'Reset',
+    rollingBtn: 'Rolling…', ellipsis: '…',
+    dieRange: 'Die range', rangeTo: 'to',
+    fakeDice: 'Fake dice',
+    fakeHint: 'Loads the dice — skews outcomes toward low or high values',
+    off: 'Off', on: 'On',
+    biasLow: 'Low', biasHigh: 'High', biasFair: 'fair',
+    biasValHigh: n => `+${n} high`, biasValLow: n => `${n} low`,
+    binSize: 'Bin size', binAutoBtn: 'Auto', binManualBtn: 'Manual',
+    autoEq: n => `auto = ${n}`,
+    progressTpl: (c, t) => `Rolling ${c} / ${t}…`,
+    statRolls: 'Rolls', statLast: 'Last sum', statAvg: 'Average', statBin: 'Bin size',
+    allSums: 'All sums',
+    langBtn: 'עב',
+  },
+  he: {
+    title: 'קובייה להתפלגות',
+    numDice: 'מספר קוביות',
+    roll: 'הטל', roll10: 'הטל ×10', roll100: 'הטל ×100', reset: 'אפס',
+    rollingBtn: 'מטיל…', ellipsis: '…',
+    dieRange: 'טווח הקובייה', rangeTo: 'עד',
+    fakeDice: 'קוביות מזויפות',
+    fakeHint: 'עיוות הסיכויים — מטה תוצאות לכיוון ערכים נמוכים או גבוהים',
+    off: 'כבוי', on: 'פועל',
+    biasLow: 'נמוך', biasHigh: 'גבוה', biasFair: 'הוגן',
+    biasValHigh: n => `+${n} גבוה`, biasValLow: n => `${n} נמוך`,
+    binSize: 'גודל תא', binAutoBtn: 'אוטו', binManualBtn: 'ידני',
+    autoEq: n => `אוטו = ${n}`,
+    progressTpl: (c, t) => `מטיל ${c} / ${t}…`,
+    statRolls: 'הטלות', statLast: 'סכום אחרון', statAvg: 'ממוצע', statBin: 'גודל תא',
+    allSums: 'כל הסכומים',
+    langBtn: 'EN',
+  }
+};
+
+function L(key, ...args) {
+  const v = I18N[currentLang][key];
+  return typeof v === 'function' ? v(...args) : v;
+}
+
+function setLang(lang) {
+  currentLang = lang;
+  document.documentElement.lang = lang;
+  document.documentElement.dir = lang === 'he' ? 'rtl' : 'ltr';
+  document.title = L('title');
+  document.getElementById('mainTitle').textContent       = L('title');
+  document.getElementById('langBtn').textContent         = L('langBtn');
+  document.getElementById('labelNumDice').textContent    = L('numDice');
+  document.getElementById('labelDieRange').textContent   = L('dieRange');
+  document.getElementById('rangeTo').textContent         = L('rangeTo');
+  document.getElementById('labelFakeDice').textContent   = L('fakeDice');
+  document.getElementById('fakeHint').textContent        = L('fakeHint');
+  fakeLabel.textContent                                  = fakeToggle.checked ? L('on') : L('off');
+  document.getElementById('labelBiasLow').textContent    = L('biasLow');
+  document.getElementById('labelBiasHigh').textContent   = L('biasHigh');
+  document.getElementById('labelBinSize').textContent    = L('binSize');
+  document.getElementById('binAuto').textContent         = L('binAutoBtn');
+  document.getElementById('binManual').textContent       = L('binManualBtn');
+  document.getElementById('labelStatRolls').textContent  = L('statRolls');
+  document.getElementById('labelStatLast').textContent   = L('statLast');
+  document.getElementById('labelStatAvg').textContent    = L('statAvg');
+  document.getElementById('labelStatBin').textContent    = L('statBin');
+  document.getElementById('allSumsLabel').textContent    = L('allSums');
+  if (!rolling) {
+    rollBtn.textContent    = L('roll');
+    roll10Btn.textContent  = L('roll10');
+    roll100Btn.textContent = L('roll100');
+  }
+  resetBtn.textContent = L('reset');
+  updateBiasVal();
+  updateBinAutoLabel();
+}
+
+function toggleLang() { setLang(currentLang === 'en' ? 'he' : 'en'); }
+
+function getDieMin() { return parseInt(dieMinEl.value) || 1; }
+function getDieMax() { return parseInt(dieMaxEl.value) || 6; }
+function isStandardDie() { return getDieMin() === 1 && getDieMax() === 6; }
+function isFaked() { return fakeToggle.checked; }
+function getBias() { return +biasSlider.value / 10; }
+
+function rollDie() {
+  const min = getDieMin(), max = getDieMax();
+  if (min === max) return min;
+  let u = Math.random();
+  const b = isFaked() ? getBias() : 0;
+  if (b > 0)      u = Math.pow(u, 1 / (1 + b * 4));
+  else if (b < 0) u = Math.pow(u, 1 + (-b) * 4);
+  return Math.min(max, Math.floor(min + u * (max - min + 1)));
+}
+
+function updateRangeHint() {
+  const sides = getDieMax() - getDieMin() + 1;
+  rangeHint.textContent = sides >= 1 ? `d${sides}` : '';
+}
+
+function updateBiasVal() {
+  const b = +biasSlider.value;
+  biasValEl.textContent = b === 0 ? L('biasFair') : b > 0 ? L('biasValHigh', b) : L('biasValLow', b);
+}
 
 function getAudio() {
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -147,55 +304,73 @@ function playRollSound(durationMs) {
   playClack(now+dur+0.06, 0.2);
 }
 
-function getAutoBin(n) {
-  if (n<=3) return 1; if (n<=6) return 2; if (n<=10) return 3; if (n<=15) return 4; return 5;
+function getAutoBin() {
+  const spread = +slider.value * (getDieMax() - getDieMin());
+  if (spread <= 5)  return 1;
+  if (spread <= 15) return 2;
+  if (spread <= 30) return 3;
+  if (spread <= 50) return 5;
+  return Math.max(1, Math.ceil(spread / 20));
 }
 function getCurrentBin() {
-  return binMode==='auto' ? getAutoBin(+slider.value) : +binSlider.value;
+  return binMode === 'auto' ? getAutoBin() : +binSlider.value;
 }
 function setBinMode(mode) {
   binMode = mode;
   document.getElementById('binAuto').classList.toggle('active', mode==='auto');
   document.getElementById('binManual').classList.toggle('active', mode==='manual');
-  binSlider.style.display = mode==='manual' ? '' : 'none';
-  binVal.style.display = mode==='manual' ? '' : 'none';
-  binAutoLabel.style.display = mode==='auto' ? '' : 'none';
-  if (mode==='manual') { binSlider.value = getAutoBin(+slider.value); binVal.textContent = binSlider.value; }
+  binSlider.style.display    = mode==='manual' ? '' : 'none';
+  binVal.style.display       = mode==='manual' ? '' : 'none';
+  binAutoLabel.style.display = mode==='auto'   ? '' : 'none';
+  if (mode==='manual') { binSlider.value = getAutoBin(); binVal.textContent = binSlider.value; }
   updateBinAutoLabel();
   if (sums.length) updateUI();
 }
 function updateBinAutoLabel() {
-  if (binMode==='auto') binAutoLabel.textContent = `auto = ${getAutoBin(+slider.value)}`;
+  if (binMode==='auto') binAutoLabel.textContent = L('autoEq', getAutoBin());
 }
 binSlider.addEventListener('input', () => { binVal.textContent = binSlider.value; if (sums.length) updateUI(); });
 
 function buildHistogram(data, binSize, minVal, maxVal) {
   const labels=[], bins=[];
   for (let lo=minVal; lo<=maxVal; lo+=binSize) {
-    const hi=Math.min(lo+binSize-1, maxVal);
+    const hi = Math.min(lo+binSize-1, maxVal);
     labels.push(binSize===1 ? String(lo) : `${lo}–${hi}`);
     bins.push(data.filter(v=>v>=lo&&v<=hi).length);
   }
   return {labels, bins};
 }
+
 function renderDice(values) {
-  diceArea.innerHTML='';
-  values.forEach(v => { const d=document.createElement('div'); d.className='die'; d.textContent=faces[v]; diceArea.appendChild(d); });
+  diceArea.innerHTML = '';
+  const standard = isStandardDie();
+  const faked = isFaked();
+  values.forEach(v => {
+    const d = document.createElement('div');
+    d.className = 'die' + (standard ? '' : ' numeric') + (faked ? ' faked' : '');
+    d.textContent = standard ? faces[v - 1] : v;
+    diceArea.appendChild(d);
+  });
 }
+
+function chartColor() { return isFaked() ? '#e06c5a' : '#378ADD'; }
+
 function updateUI() {
-  const n=+slider.value, minVal=n, maxVal=n*6, binSize=getCurrentBin();
-  const {labels, bins}=buildHistogram(sums, binSize, minVal, maxVal);
+  const n = +slider.value;
+  const minVal = n * getDieMin(), maxVal = n * getDieMax();
+  const binSize = getCurrentBin();
+  const {labels, bins} = buildHistogram(sums, binSize, minVal, maxVal);
   statsRow.style.display='grid'; sumsRow.style.display='block'; chartSection.style.display='block';
-  document.getElementById('statRolls').textContent=sums.length;
-  document.getElementById('statLast').textContent=sums[sums.length-1];
-  document.getElementById('statAvg').textContent=(sums.reduce((a,b)=>a+b,0)/sums.length).toFixed(1);
-  document.getElementById('statBin').textContent=binSize;
-  sumsList.innerHTML=sums.map((s,i)=>`<span class="sum-pill${i===sums.length-1?' last':''}">${s}</span>`).join('');
+  document.getElementById('statRolls').textContent = sums.length;
+  document.getElementById('statLast').textContent  = sums[sums.length-1];
+  document.getElementById('statAvg').textContent   = (sums.reduce((a,b)=>a+b,0)/sums.length).toFixed(1);
+  document.getElementById('statBin').textContent   = binSize;
+  sumsList.innerHTML = sums.map((s,i)=>`<span class="sum-pill${i===sums.length-1?' last':''}">${s}</span>`).join('');
   if (!chartInstance) {
-    chartInstance=new Chart(document.getElementById('chart'), {
-      type:'bar',
-      data:{labels, datasets:[{label:'Count', data:bins, backgroundColor:'#378ADD', borderRadius:3, borderSkipped:false}]},
-      options:{
+    chartInstance = new Chart(document.getElementById('chart'), {
+      type: 'bar',
+      data: {labels, datasets:[{label:'Count', data:bins, backgroundColor:chartColor(), borderRadius:3, borderSkipped:false}]},
+      options: {
         responsive:true, maintainAspectRatio:false,
         plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>` Count: ${ctx.raw}`}}},
         scales:{
@@ -206,22 +381,29 @@ function updateUI() {
       }
     });
   } else {
-    chartInstance.data.labels=labels;
-    chartInstance.data.datasets[0].data=bins;
+    chartInstance.data.labels = labels;
+    chartInstance.data.datasets[0].data = bins;
+    chartInstance.data.datasets[0].backgroundColor = chartColor();
     chartInstance.update();
   }
 }
 
+function resetSums() {
+  sums = [];
+  if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+  statsRow.style.display='none'; sumsRow.style.display='none'; chartSection.style.display='none';
+}
+
 function setButtons(disabled, label) {
   rollBtn.disabled=disabled; roll10Btn.disabled=disabled; roll100Btn.disabled=disabled;
-  rollBtn.textContent=disabled&&label==='roll'?'Rolling…':'Roll';
-  roll10Btn.textContent=disabled&&label==='10'?'…':'Roll ×10';
-  roll100Btn.textContent=disabled&&label==='100'?'…':'Roll ×100';
+  rollBtn.textContent    = disabled && label==='roll' ? L('rollingBtn') : L('roll');
+  roll10Btn.textContent  = disabled && label==='10'   ? L('ellipsis')   : L('roll10');
+  roll100Btn.textContent = disabled && label==='100'  ? L('ellipsis')   : L('roll100');
 }
 function setProgress(show, current, total) {
   progressBar.style.display = show ? 'block' : 'none';
   if (show) {
-    progressLabel.textContent = `Rolling ${current} / ${total}…`;
+    progressLabel.textContent = L('progressTpl', current, total);
     const pct = Math.round(current/total*100);
     progressPct.textContent = pct + '%';
     progressFill.style.width = pct + '%';
@@ -229,12 +411,12 @@ function setProgress(show, current, total) {
 }
 function animateAndRoll(count, durationMs, onDone) {
   playRollSound(durationMs);
-  const start=Date.now();
-  const iv=setInterval(()=>{
-    renderDice(Array.from({length:count},()=>Math.floor(Math.random()*6)));
-    if (Date.now()-start>=durationMs) {
+  const start = Date.now();
+  const iv = setInterval(() => {
+    renderDice(Array.from({length:count}, ()=>rollDie()));
+    if (Date.now()-start >= durationMs) {
       clearInterval(iv);
-      const final=Array.from({length:count},()=>Math.floor(Math.random()*6));
+      const final = Array.from({length:count}, ()=>rollDie());
       renderDice(final); onDone(final);
     }
   }, 80);
@@ -242,49 +424,79 @@ function animateAndRoll(count, durationMs, onDone) {
 
 function doManyRolls(total) {
   rolling=true; setButtons(true, total===10?'10':'100');
-  const count=+slider.value;
+  const count = +slider.value;
   const perRollMs = total===100 ? 100 : 2000;
-  let done=0;
+  let done = 0;
   if (total===100) setProgress(true, 0, total);
   function doOne() {
-    animateAndRoll(count, perRollMs, (final)=>{
+    animateAndRoll(count, perRollMs, (final) => {
       done++;
-      sums.push(final.reduce((a,v)=>a+v+1,0));
+      sums.push(final.reduce((a,v)=>a+v, 0));
       if (total===100) setProgress(true, done, total);
       updateUI();
-      if (done<total) doOne();
+      if (done < total) doOne();
       else { if (total===100) setProgress(false); rolling=false; setButtons(false); }
     });
   }
   doOne();
 }
 
-rollBtn.addEventListener('click', ()=>{
+rollBtn.addEventListener('click', () => {
   if (rolling) return; rolling=true; setButtons(true,'roll');
-  animateAndRoll(+slider.value, 2000, (final)=>{ sums.push(final.reduce((a,v)=>a+v+1,0)); updateUI(); rolling=false; setButtons(false); });
+  animateAndRoll(+slider.value, 2000, (final) => {
+    sums.push(final.reduce((a,v)=>a+v, 0));
+    updateUI(); rolling=false; setButtons(false);
+  });
 });
-roll10Btn.addEventListener('click', ()=>{ if (!rolling) doManyRolls(10); });
-roll100Btn.addEventListener('click', ()=>{ if (!rolling) doManyRolls(100); });
-resetBtn.addEventListener('click', ()=>{
-  sums=[];
-  if (chartInstance){chartInstance.destroy();chartInstance=null;}
-  statsRow.style.display='none'; sumsRow.style.display='none'; chartSection.style.display='none';
-  setProgress(false); diceArea.innerHTML='';
-  renderDice(Array.from({length:+slider.value},()=>Math.floor(Math.random()*6)));
-});
-slider.addEventListener('input', ()=>{
-  sliderOut.textContent=slider.value;
-  updateBinAutoLabel();
-  if (binMode==='manual') binSlider.max=Math.max(1,+slider.value*6-+slider.value);
-  if (sums.length) {
-    sums=[]; if (chartInstance){chartInstance.destroy();chartInstance=null;}
-    statsRow.style.display='none'; sumsRow.style.display='none'; chartSection.style.display='none';
-  }
-  renderDice(Array.from({length:+slider.value},()=>Math.floor(Math.random()*6)));
+roll10Btn.addEventListener('click',  () => { if (!rolling) doManyRolls(10); });
+roll100Btn.addEventListener('click', () => { if (!rolling) doManyRolls(100); });
+resetBtn.addEventListener('click', () => {
+  resetSums(); setProgress(false); diceArea.innerHTML='';
+  renderDice(Array.from({length:+slider.value}, ()=>rollDie()));
 });
 
+slider.addEventListener('input', () => {
+  sliderOut.textContent = slider.value;
+  updateBinAutoLabel();
+  if (binMode==='manual') binSlider.max = Math.max(1, +slider.value*(getDieMax()-getDieMin()));
+  if (sums.length) resetSums();
+  renderDice(Array.from({length:+slider.value}, ()=>rollDie()));
+});
+
+function applyRangeChange() {
+  updateRangeHint();
+  updateBinAutoLabel();
+  resetSums();
+  renderDice(Array.from({length:+slider.value}, ()=>rollDie()));
+}
+
+dieMinEl.addEventListener('change', () => {
+  let min = parseInt(dieMinEl.value), max = getDieMax();
+  if (isNaN(min)) { dieMinEl.value = 1; min = 1; }
+  if (min > max) { dieMaxEl.value = min; }
+  applyRangeChange();
+});
+
+dieMaxEl.addEventListener('change', () => {
+  let max = parseInt(dieMaxEl.value), min = getDieMin();
+  if (isNaN(max)) { dieMaxEl.value = 6; max = 6; }
+  if (max < min) { dieMinEl.value = max; }
+  applyRangeChange();
+});
+
+fakeToggle.addEventListener('change', () => {
+  const on = fakeToggle.checked;
+  fakeLabel.textContent = on ? L('on') : L('off');
+  biasRow.style.display = on ? 'flex' : 'none';
+  if (sums.length) updateUI();
+  renderDice(Array.from({length:+slider.value}, ()=>rollDie()));
+});
+
+biasSlider.addEventListener('input', updateBiasVal);
+
 setBinMode('auto');
-renderDice(Array.from({length:6},()=>Math.floor(Math.random()*6)));
+updateRangeHint();
+renderDice(Array.from({length:6}, ()=>rollDie()));
 </script>
 </body>
 </html>
